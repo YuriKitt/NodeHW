@@ -1,42 +1,23 @@
-const express = require('express');
-const swaggerJsDoc = require('swagger-jsdoc');
-const swaggerUi = require('swagger-ui-express');
+import express, { Request, Response, Application } from 'express';
+import swaggerJsDoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
+import swaggerDefinition from './swagger';
 
-const app = express();
+const app: Application = express();
 const PORT = 3000;
 
-const swaggerOptions = {
-  swaggerDefinition: {
-    info: {
-      title: 'Health Check',
-      description: 'Health Check API Information',
-      contact: {
-        name: 'Developer',
-      },
-      servers: ['http://localhost:3000'],
-    },
-  },
-  apis: ['./src/index.js'],
-};
+const swaggerDocs = swaggerJsDoc({
+  definition: swaggerDefinition,
+  apis: ['./src/index.ts'],
+});
 
-const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-/**
- * @swagger
- * /health-check:
- *  get:
- *    description: Check the health of the server
- *    responses:
- *      '200':
- *        description: A successful response
- */
-
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response): void => {
   res.send('Hello World!');
 });
 
-app.get('/health-check', (req, res) => {
+app.get('/health-check', (req: Request, res: Response): void => {
   res.status(200).json({ status: 'OK', message: 'Server is running' });
 });
 
