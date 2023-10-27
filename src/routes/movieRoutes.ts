@@ -1,8 +1,14 @@
 import { Router, Request, Response } from 'express';
 import Joi from 'joi';
 import Movie, { IMovie } from '../models/movie';
+import Genre from '../models/genre';
 
 const router = Router();
+
+async function validateGenres(genreNames: string[]) {
+  const genres = await Genre.find({ name: { $in: genreNames } });
+  return genres.length === genreNames.length;
+}
 
 const movieSchema = Joi.object({
   title: Joi.string().required(),
@@ -61,13 +67,17 @@ const genreNameSchema = Joi.string().min(3).max(50).messages({
 router.post('/', async (req: Request, res: Response) => {
   try {
     await movieSchema.validateAsync(req.body);
+    if (!Array.isArray(req.body.genre)) {
+      return res.status(400).json({ error: 'Genres must be an array' });
+    }
+    const areGenresValid = await validateGenres(req.body.genre);
+    if (!areGenresValid) {
+      return res.status(400).json({ error: 'One or more genres are invalid' });
+    }
     const newMovie: IMovie = new Movie(req.body);
     const movie = await newMovie.save();
     res.status(201).json(movie);
   } catch (error: unknown) {
-    if (error instanceof Joi.ValidationError) {
-      return res.status(400).json({ error: error.message });
-    }
     if (error instanceof Joi.ValidationError) {
       return res.status(400).json({ error: error.message });
     }
@@ -144,9 +154,6 @@ router.get('/:id', async (req: Request, res: Response) => {
     if (error instanceof Joi.ValidationError) {
       return res.status(400).json({ error: error.message });
     }
-    if (error instanceof Joi.ValidationError) {
-      return res.status(400).json({ error: error.message });
-    }
     if (error instanceof Error) {
       res.status(500).json({ error: error.message });
     }
@@ -188,6 +195,15 @@ router.put('/:id', async (req: Request, res: Response) => {
   try {
     await idSchema.validateAsync(req.params.id);
     await movieUpdateSchema.validateAsync(req.body);
+    if ('genre' in req.body) {
+      if (!Array.isArray(req.body.genre)) {
+        return res.status(400).json({ error: 'Genres must be an array' });
+      }
+      const areGenresValid = await validateGenres(req.body.genre);
+      if (!areGenresValid) {
+        return res.status(400).json({ error: 'One or more genres are invalid' });
+      }
+    }
     const updatedMovie = await Movie.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (updatedMovie) {
       res.status(200).json(updatedMovie);
@@ -195,9 +211,6 @@ router.put('/:id', async (req: Request, res: Response) => {
       res.status(404).json({ error: "Movie not found" });
     }
   } catch (error: unknown) {
-    if (error instanceof Joi.ValidationError) {
-      return res.status(400).json({ error: error.message  });
-    }
     if (error instanceof Joi.ValidationError) {
       return res.status(400).json({ error: error.message  });
     }
@@ -245,9 +258,6 @@ router.delete('/:id', async (req: Request, res: Response) => {
     if (error instanceof Joi.ValidationError) {
       return res.status(400).json({ error: error.message });
     }
-    if (error instanceof Joi.ValidationError) {
-      return res.status(400).json({ error: error.message });
-    }
     if (error instanceof Error) {
       res.status(500).json({ error: error.message });
     }
@@ -292,9 +302,6 @@ router.get('/genre/:genreName', async (req: Request, res: Response) => {
         res.status(404).json({ error: "No movies found for this genre" });
       }
     } catch (error: unknown) {
-      if (error instanceof Joi.ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
       if (error instanceof Joi.ValidationError) {
         return res.status(400).json({ error: error.message });
       }
