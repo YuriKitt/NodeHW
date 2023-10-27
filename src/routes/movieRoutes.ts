@@ -1,8 +1,33 @@
 import { Router, Request, Response } from 'express';
 import Joi from 'joi';
+import Joi from 'joi';
 import Movie, { IMovie } from '../models/movie';
 
 const router = Router();
+
+const movieSchema = Joi.object({
+  title: Joi.string().required(),
+  description: Joi.string().required(),
+  releaseDate: Joi.date().required(),
+  genre: Joi.array().items(Joi.string()).required()
+});
+
+const movieUpdateSchema = Joi.object({
+  title: Joi.string(),
+  description: Joi.string(),
+  releaseDate: Joi.date(),
+  genre: Joi.array().items(Joi.string())
+}).min(1);
+
+const idSchema = Joi.string().length(24).hex().messages({
+    'string.length': 'Movie ID must be 24 characters long',
+    'string.hex': 'Movie ID must only contain hexadecimal characters'
+  });
+
+const genreNameSchema = Joi.string().min(3).max(50).messages({
+  'string.min': 'Genre name must be at least 3 character long',
+  'string.max': 'Genre name must be less than or equal to 50 characters long',
+});
 
 const movieSchema = Joi.object({
   title: Joi.string().required(),
@@ -49,11 +74,18 @@ const genreNameSchema = Joi.string().min(3).max(50).messages({
  *     responses:
  *       201:
  *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *             $ref: '#/components/schemas/Movie'
  *       400:
  *         description: Bad Request
+ *       500:
+ *         description: Internal Server Error
  */
 router.post('/', async (req: Request, res: Response) => {
   try {
+    await movieSchema.validateAsync(req.body);
     await movieSchema.validateAsync(req.body);
     const newMovie: IMovie = new Movie(req.body);
     const movie = await newMovie.save();
@@ -62,8 +94,11 @@ router.post('/', async (req: Request, res: Response) => {
     if (error instanceof Joi.ValidationError) {
       return res.status(400).json({ error: error.message });
     }
+    if (error instanceof Joi.ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     if (error instanceof Error) {
-      res.status(400).json({ error: error.message });
+      res.status(500).json({ error: error.message });
     }
   }
 });
@@ -77,6 +112,14 @@ router.post('/', async (req: Request, res: Response) => {
  *     responses:
  *       200:
  *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Movie'
+ *       500:
+ *         description: Internal Server Error
  */
 router.get('/', async (_req: Request, res: Response) => {
   try {
@@ -103,11 +146,20 @@ router.get('/', async (_req: Request, res: Response) => {
  *     responses:
  *       200:
  *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Movie'
+ *       400:
+ *         description: Bad Request
  *       404:
  *         description: Movie not found
+ *       500:
+ *         description: Internal Server Error
  */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
+    await idSchema.validateAsync(req.params.id);
     await idSchema.validateAsync(req.params.id);
     const movie = await Movie.findById(req.params.id);
     if (movie) {
@@ -116,6 +168,9 @@ router.get('/:id', async (req: Request, res: Response) => {
       res.status(404).json({ error: "Movie not found" });
     }
   } catch (error: unknown) {
+    if (error instanceof Joi.ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     if (error instanceof Joi.ValidationError) {
       return res.status(400).json({ error: error.message });
     }
@@ -145,13 +200,21 @@ router.get('/:id', async (req: Request, res: Response) => {
  *     responses:
  *       200:
  *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Movie'
  *       400:
  *         description: Bad Request
  *       404:
  *         description: Movie not found
+ *       500:
+ *         description: Internal Server Error
  */
 router.put('/:id', async (req: Request, res: Response) => {
   try {
+    await idSchema.validateAsync(req.params.id);
+    await movieUpdateSchema.validateAsync(req.body);
     await idSchema.validateAsync(req.params.id);
     await movieUpdateSchema.validateAsync(req.body);
     const updatedMovie = await Movie.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -164,8 +227,11 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (error instanceof Joi.ValidationError) {
       return res.status(400).json({ error: error.message  });
     }
+    if (error instanceof Joi.ValidationError) {
+      return res.status(400).json({ error: error.message  });
+    }
     if (error instanceof Error) {
-      res.status(400).json({ error: error.message });
+      res.status(500).json({ error: error.message });
     }
   }
 });
@@ -184,11 +250,20 @@ router.put('/:id', async (req: Request, res: Response) => {
  *     responses:
  *       200:
  *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Movie'
+ *       400:
+ *         description: Bad Request
  *       404:
  *         description: Movie not found
+ *       500:
+ *         description: Internal Server Error
  */
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
+    await idSchema.validateAsync(req.params.id);
     await idSchema.validateAsync(req.params.id);
     const deletedMovie = await Movie.findByIdAndRemove(req.params.id);
     if (deletedMovie) {
@@ -197,6 +272,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
       res.status(404).json({ error: "Movie not found" });
     }
   } catch (error: unknown) {
+    if (error instanceof Joi.ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     if (error instanceof Joi.ValidationError) {
       return res.status(400).json({ error: error.message });
     }
@@ -220,11 +298,22 @@ router.delete('/:id', async (req: Request, res: Response) => {
  *     responses:
  *       200:
  *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Movie'
+ *       400:
+ *         description: Bad Request
  *       404:
  *         description: No movies found for this genre
+ *       500:
+ *         description: Internal Server Error
  */
 router.get('/genre/:genreName', async (req: Request, res: Response) => {
     try {
+      await genreNameSchema.validateAsync(req.params.genreName);
       await genreNameSchema.validateAsync(req.params.genreName);
       const genreName = req.params.genreName;
       const movies = await Movie.find({ genre: genreName });
@@ -234,6 +323,9 @@ router.get('/genre/:genreName', async (req: Request, res: Response) => {
         res.status(404).json({ error: "No movies found for this genre" });
       }
     } catch (error: unknown) {
+      if (error instanceof Joi.ValidationError) {
+        return res.status(400).json({ error: error.message });
+      }
       if (error instanceof Joi.ValidationError) {
         return res.status(400).json({ error: error.message });
       }
