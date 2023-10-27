@@ -1,19 +1,21 @@
 import express, { Request, Response, Application } from 'express';
 import mongoose, { ConnectOptions } from 'mongoose';
+import { config } from 'dotenv';
 import swaggerJsDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import swaggerDefinition from './swagger';
 import healthCheckRouter from './routes/healthCheck';
 import movieRoutes from './routes/movieRoutes';
 import genreRoutes from './routes/genreRoutes';
+config();
 
 const app: Application = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-const username = "epamhw";
-const password = "epamnode";
-const cluster = "epam.ovtqb1a.mongodb.net";
-const databaseName = "EPAM";
+const username = process.env.DB_USERNAME;
+const password = process.env.DB_PASSWORD;
+const cluster = process.env.DB_CLUSTER;
+const databaseName = process.env.DB_NAME;
 
 const uri: string = `mongodb+srv://${username}:${password}@${cluster}/${databaseName}?retryWrites=true&w=majority`;
 
