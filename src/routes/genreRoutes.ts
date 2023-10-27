@@ -1,7 +1,17 @@
 import { Router, Request, Response } from 'express';
+import Joi from 'joi';
 import Genre, { IGenre } from '../models/genre';
 
 const router = Router();
+
+const genreSchema = Joi.object({
+  name: Joi.string().min(3).max(50).required()
+});
+
+const idSchema = Joi.string().length(24).hex().messages({
+  'string.length': 'Genre ID must be 24 characters long',
+  'string.hex': 'Genre ID must only contain hexadecimal characters'
+});
 
 /**
  * @swagger
@@ -30,15 +40,21 @@ const router = Router();
  *               $ref: '#/components/schemas/Genre'
  *       400:
  *         description: Bad request
+ *       500:
+ *         description: Internal Server Error
  */
 router.post('/', async (req: Request, res: Response) => {
     try {
+      await genreSchema.validateAsync(req.body);
       const newGenre: IGenre = new Genre(req.body);
       const genre = await newGenre.save();
       res.status(201).json(genre);
     } catch (error: unknown) {
+      if (error instanceof Joi.ValidationError) {
+        return res.status(400).json({ error: error.message });
+      }
       if (error instanceof Error) {
-        res.status(400).json({ error: error.message });
+        res.status(500).json({ error: error.message });
       }
     }
   });
@@ -91,6 +107,8 @@ router.get('/', async (_req: Request, res: Response) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Genre'
+ *       400:
+ *         description: Bad Request
  *       404:
  *         description: Genre not found
  *       500:
@@ -98,6 +116,7 @@ router.get('/', async (_req: Request, res: Response) => {
  */
 router.get('/:id', async (req: Request, res: Response) => {
     try {
+      await idSchema.validateAsync(req.params.id);
       const genre = await Genre.findById(req.params.id);
       if (genre) {
         res.status(200).json(genre);
@@ -105,6 +124,9 @@ router.get('/:id', async (req: Request, res: Response) => {
         res.status(404).json({ error: "Genre not found" });
       }
     } catch (error: unknown) {
+      if (error instanceof Joi.ValidationError) {
+        return res.status(400).json({ error: error.message });
+      }
       if (error instanceof Error) {
         res.status(500).json({ error: error.message });
       }
@@ -140,9 +162,13 @@ router.get('/:id', async (req: Request, res: Response) => {
  *         description: Bad Request
  *       404:
  *         description: Genre not found
+ *       500:
+ *         description: Internal Server Error
  */
 router.put('/:id', async (req: Request, res: Response) => {
     try {
+      await idSchema.validateAsync(req.params.id);
+      await genreSchema.validateAsync(req.body);
       const updatedGenre = await Genre.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
       if (updatedGenre) {
         res.status(200).json(updatedGenre);
@@ -150,8 +176,11 @@ router.put('/:id', async (req: Request, res: Response) => {
         res.status(404).json({ error: "Genre not found" });
       }
     } catch (error: unknown) {
+      if (error instanceof Joi.ValidationError) {
+        return res.status(400).json({ error: error.message  });
+      }
       if (error instanceof Error) {
-        res.status(400).json({ error: error.message });
+        res.status(500).json({ error: error.message });
       }
     }
   });
@@ -175,6 +204,8 @@ router.put('/:id', async (req: Request, res: Response) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Genre'
+ *       400:
+ *         description: Bad Request
  *       404:
  *         description: Genre not found
  *       500:
@@ -182,6 +213,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  */
 router.delete('/:id', async (req: Request, res: Response) => {
     try {
+      await idSchema.validateAsync(req.params.id);
       const deletedGenre = await Genre.findByIdAndDelete(req.params.id);
       if (deletedGenre) {
         res.status(200).json(deletedGenre);
@@ -189,6 +221,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
         res.status(404).json({ error: "Genre not found" });
       }
     } catch (error: unknown) {
+      if (error instanceof Joi.ValidationError) {
+        return res.status(400).json({ error: error.message });
+      }
       if (error instanceof Error) {
         res.status(500).json({ error: error.message });
       }
