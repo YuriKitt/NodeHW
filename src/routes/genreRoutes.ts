@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
 import Genre, { IGenre } from '../models/genre';
 
@@ -43,19 +43,14 @@ const idSchema = Joi.string().length(24).hex().messages({
  *       500:
  *         description: Internal Server Error
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     try {
       await genreSchema.validateAsync(req.body);
       const newGenre: IGenre = new Genre(req.body);
       const genre = await newGenre.save();
       res.status(201).json(genre);
     } catch (error: unknown) {
-      if (error instanceof Joi.ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
-      if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      }
+      next(error);
     }
   });
 
@@ -77,14 +72,12 @@ router.post('/', async (req: Request, res: Response) => {
  *       500:
  *         description: Internal Server Error
  */
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const genres = await Genre.find({});
       res.status(200).json(genres);
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      }
+      next(error);
     }
   });
 
@@ -114,7 +107,7 @@ router.get('/', async (_req: Request, res: Response) => {
  *       500:
  *         description: Internal Server Error
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
       await idSchema.validateAsync(req.params.id);
       const genre = await Genre.findById(req.params.id);
@@ -124,12 +117,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         res.status(404).json({ error: "Genre not found" });
       }
     } catch (error: unknown) {
-      if (error instanceof Joi.ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
-      if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      }
+      next(error);
     }
   });
 
@@ -165,7 +153,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  *       500:
  *         description: Internal Server Error
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
       await idSchema.validateAsync(req.params.id);
       await genreSchema.validateAsync(req.body);
@@ -176,12 +164,7 @@ router.put('/:id', async (req: Request, res: Response) => {
         res.status(404).json({ error: "Genre not found" });
       }
     } catch (error: unknown) {
-      if (error instanceof Joi.ValidationError) {
-        return res.status(400).json({ error: error.message  });
-      }
-      if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      }
+      next(error);
     }
   });
 
@@ -211,7 +194,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  *       500:
  *         description: Internal Server Error
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
       await idSchema.validateAsync(req.params.id);
       const deletedGenre = await Genre.findByIdAndDelete(req.params.id);
@@ -221,12 +204,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
         res.status(404).json({ error: "Genre not found" });
       }
     } catch (error: unknown) {
-      if (error instanceof Joi.ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
-      if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      }
+      next(error);
     }
   });
 

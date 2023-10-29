@@ -3,6 +3,7 @@ import mongoose, { ConnectOptions } from 'mongoose';
 import { config } from 'dotenv';
 import swaggerJsDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import { errorHandler } from './middlewares/errorHandler';
 import swaggerDefinition from './swagger';
 import healthCheckRouter from './routes/healthCheck';
 import movieRoutes from './routes/movieRoutes';
@@ -57,6 +58,8 @@ app.get('/', (req: Request, res: Response): void => {
 });
 
 app.use('/health-check', healthCheckRouter);
+
+app.use(errorHandler);
 
 const server = app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
