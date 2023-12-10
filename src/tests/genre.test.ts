@@ -1,16 +1,18 @@
 import request from 'supertest';
 import app from '../app';
-import { mockGenres } from './mockData';
 import Genre from '../models/genre';
-import { connect, disconnect } from '../database';
+import { mockGenres } from './mockData';
 
 // Test for GET all genres
 describe('GET /api/genres', () => {
   it('should return a list of genres', async () => {
+    Genre.find = jest.fn().mockResolvedValue(mockGenres);
     const res = await request(app).get('/api/genres');
+    expect(Genre.find).toHaveBeenCalledTimes(1);
     expect(res.statusCode).toEqual(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toEqual(mockGenres.length);
+    expect(res.body).toEqual(mockGenres);
   });
 });
 
@@ -18,6 +20,7 @@ describe('GET /api/genres', () => {
 describe('POST /api/genres', () => {
   it('should create a new genre', async () => {
     const newGenre = { name: 'Test Genre' };
+    Genre.prototype.save = jest.fn().mockResolvedValue(newGenre);
     const res = await request(app).post('/api/genres').send(newGenre);
     expect(res.statusCode).toEqual(201);
     expect(res.body.name).toEqual(newGenre.name);
@@ -27,13 +30,21 @@ describe('POST /api/genres', () => {
 // Test for PUT (Update an existing genre)
 describe('PUT /api/genres/:id', () => {
   it('should update an existing genre', async () => {
-    const genre = await Genre.findOne();
-    if (genre) {
-      const updatedData = { name: 'Updated Genre' };
-      const res = await request(app).put(`/api/genres/${genre._id}`).send(updatedData);
-      expect(res.statusCode).toEqual(200);
-      expect(res.body.name).toEqual('Updated Genre');
-    }
+    const mockGenreId = 'aaaa12345678901234567890';
+    const updatedData = { name: 'Updated Genre' };
+    Genre.findByIdAndUpdate = jest
+      .fn()
+      .mockResolvedValue({ _id: mockGenreId, ...updatedData });
+    const res = await request(app)
+      .put(`/api/genres/${mockGenreId}`)
+      .send(updatedData);
+    expect(Genre.findByIdAndUpdate).toHaveBeenCalledWith(
+      mockGenreId,
+      updatedData,
+      { new: true, runValidators: true }
+    );
+    expect(res.statusCode).toEqual(200);
+    expect(res.body.name).toEqual('Updated Genre');
   });
 });
 
@@ -42,20 +53,23 @@ describe('PUT /api/genres/:id', () => {
   it('should return 404 if genre is not found', async () => {
     const nonExistentId = 'aaaa12345678901234567890';
     const updatedData = { name: 'This Should Fail' };
-    const res = await request(app).put(`/api/genres/${nonExistentId}`).send(updatedData);
+    Genre.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
+    const res = await request(app)
+      .put(`/api/genres/${nonExistentId}`)
+      .send(updatedData);
     expect(res.statusCode).toEqual(404);
   });
 });
 
-
 // Test for DELETE (Delete an existing genre)
 describe('DELETE /api/genres/:id', () => {
   it('should delete an existing genre', async () => {
-    const genre = await Genre.findOne();
-    if (genre) {
-      const res = await request(app).delete(`/api/genres/${genre._id}`);
-      expect(res.statusCode).toEqual(204);
-    }
+    const genreId = 'aaaa12345678901234567890';
+    const mockGenre = { _id: genreId, name: 'Mock Genre' };
+    Genre.findByIdAndDelete = jest.fn().mockResolvedValue(mockGenre);
+    const res = await request(app).delete(`/api/genres/${genreId}`);
+    expect(Genre.findByIdAndDelete).toHaveBeenCalledWith(genreId);
+    expect(res.statusCode).toEqual(204);
   });
 });
 
@@ -63,7 +77,9 @@ describe('DELETE /api/genres/:id', () => {
 describe('DELETE /api/genres/:id', () => {
   it('should return 404 if genre is not found', async () => {
     const nonExistentId = 'aaaa12345678901234567890';
+    Genre.findByIdAndDelete = jest.fn().mockResolvedValue(null);
     const res = await request(app).delete(`/api/genres/${nonExistentId}`);
+    expect(Genre.findByIdAndDelete).toHaveBeenCalledWith(nonExistentId);
     expect(res.statusCode).toEqual(404);
   });
 });
@@ -71,12 +87,13 @@ describe('DELETE /api/genres/:id', () => {
 // Test for GET a single genre by ID
 describe('GET /api/genres/:id', () => {
   it('should return a single genre by ID', async () => {
-    const genre = await Genre.findOne();
-    if (genre) {
-      const res = await request(app).get(`/api/genres/${genre._id}`);
-      expect(res.statusCode).toEqual(200);
-      expect(res.body.name).toEqual(genre.name);
-    }
+    const mockGenreId = 'aaaa12345678901234567890';
+    const mockGenre = { _id: mockGenreId, name: 'Mock Genre' };
+    Genre.findById = jest.fn().mockResolvedValue(mockGenre);
+    const res = await request(app).get(`/api/genres/${mockGenreId}`);
+    expect(Genre.findById).toHaveBeenCalledWith(mockGenreId);
+    expect(res.statusCode).toEqual(200);
+    expect(res.body.name).toEqual(mockGenre.name);
   });
 });
 
@@ -84,8 +101,10 @@ describe('GET /api/genres/:id', () => {
 describe('GET /api/genres/:id', () => {
   it('should return 404 if genre is not found', async () => {
     const nonExistentId = 'aaaa12345678901234567890';
+    Genre.findById = jest.fn().mockResolvedValue(null);
     const res = await request(app).get(`/api/genres/${nonExistentId}`);
-    expect(res.body.error).toEqual("Genre not found");
+    expect(Genre.findById).toHaveBeenCalledWith(nonExistentId);
+    expect(res.body.error).toEqual('Genre not found');
     expect(res.statusCode).toEqual(404);
   });
 });
@@ -102,9 +121,8 @@ describe('Error handling and validation', () => {
 // Test for error 500
 describe('GET /api/genres', () => {
   it('should return 500 if database operation fails', async () => {
-    await disconnect();
+    Genre.find = jest.fn().mockRejectedValue(new Error('Database error'));
     const res = await request(app).get('/api/genres');
     expect(res.statusCode).toEqual(500);
-    await connect();
   });
 });

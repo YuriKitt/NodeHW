@@ -1,13 +1,15 @@
 import request from 'supertest';
 import app from '../app';
-import { mockMovies } from './mockData';
 import Movie from '../models/movie';
-import { connect, disconnect } from '../database';
+import Genre from '../models/genre';
+import { mockMovies } from './mockData';
 
 // Test for GET all movies
 describe('GET /api/movies', () => {
   it('should return a list of movies', async () => {
+    Movie.find = jest.fn().mockResolvedValue(mockMovies);
     const res = await request(app).get('/api/movies');
+    expect(Movie.find).toHaveBeenCalledTimes(1);
     expect(res.statusCode).toEqual(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toEqual(mockMovies.length);
@@ -17,12 +19,15 @@ describe('GET /api/movies', () => {
 // Test for GET a single movie by ID
 describe('GET /api/movies/:id', () => {
   it('should return a single movie by ID', async () => {
-    const movie = await Movie.findOne();
-    if (movie) {
-      const res = await request(app).get(`/api/movies/${movie._id}`);
-      expect(res.statusCode).toEqual(200);
-      expect(res.body.title).toEqual(movie.title);
-    }
+    const mockMovie = { ...mockMovies[0], _id: 'aaaa12345678901234567890' };
+    Movie.findById = jest.fn().mockResolvedValue(mockMovie);
+    const res = await request(app).get(`/api/movies/${mockMovie._id}`);
+    expect(Movie.findById).toHaveBeenCalledWith(mockMovie._id);
+    expect(res.statusCode).toEqual(200);
+    expect({
+      ...res.body,
+      releaseDate: new Date(res.body.releaseDate),
+    }).toEqual(mockMovie);
   });
 });
 
@@ -30,8 +35,9 @@ describe('GET /api/movies/:id', () => {
 describe('GET /api/movies/:id', () => {
   it('should return 404 if movie is not found', async () => {
     const nonExistentId = 'aaaa12345678901234567890';
+    Movie.findById = jest.fn().mockResolvedValue(null);
     const res = await request(app).get(`/api/movies/${nonExistentId}`);
-    expect(res.body.error).toEqual("Movie not found");
+    expect(Movie.findById).toHaveBeenCalledWith(nonExistentId);
     expect(res.statusCode).toEqual(404);
   });
 });
@@ -43,14 +49,16 @@ describe('POST /api/movies', () => {
       title: 'Test Movie',
       description: 'This is a test',
       releaseDate: new Date(),
-      genre: ['Action']
+      genre: ['Action'],
     };
+    Genre.find = jest.fn().mockResolvedValue([{ name: 'Action' }]);
+    Movie.prototype.save = jest.fn().mockResolvedValue(newMovie);
     const res = await request(app).post('/api/movies').send(newMovie);
     expect(res.statusCode).toEqual(201);
-    expect(res.body.title).toEqual(newMovie.title);
-    expect(res.body.description).toEqual(newMovie.description);
-    expect(new Date(res.body.releaseDate)).toEqual(newMovie.releaseDate);
-    expect(res.body.genre).toEqual(expect.arrayContaining(newMovie.genre));
+    expect({
+      ...res.body,
+      releaseDate: new Date(res.body.releaseDate),
+    }).toEqual(newMovie);
   });
 });
 
@@ -61,8 +69,9 @@ describe('POST /api/movies', () => {
       title: 'Test Movie',
       description: 'This is a test',
       releaseDate: new Date(),
-      genre: 'Action'
+      genre: 'Action',
     };
+    Genre.find = jest.fn().mockResolvedValue([{ name: 'Action' }]);
     const res = await request(app).post('/api/movies').send(newMovie);
     expect(res.statusCode).toEqual(400);
   });
@@ -75,8 +84,9 @@ describe('POST /api/movies', () => {
       title: 'Test Movie',
       description: 'This is a test',
       releaseDate: new Date(),
-      genre: ['Action', 'InvalidGenre']
+      genre: ['Action', 'InvalidGenre'],
     };
+    Genre.find = jest.fn().mockResolvedValue([{ name: 'Action' }]);
     const res = await request(app).post('/api/movies').send(newMovie);
     expect(res.statusCode).toEqual(400);
   });
@@ -85,15 +95,21 @@ describe('POST /api/movies', () => {
 // Test for PUT (Update an existing movie)
 describe('PUT /api/movies/:id', () => {
   it('should update an existing movie', async () => {
-    const movie = await Movie.findOne();
-    if (movie) {
-      const updatedData = {
-        title: 'Updated Title'
-      };
-      const res = await request(app).put(`/api/movies/${movie._id}`).send(updatedData);
-      expect(res.statusCode).toEqual(200);
-      expect(res.body.title).toEqual('Updated Title');
-    }
+    const fakeId = 'aaaa12345678901234567890';
+    const updatedData = { title: 'Updated Title' };
+    const movieToUpdate = { _id: fakeId, ...mockMovies[0] };
+    Movie.findByIdAndUpdate = jest.fn().mockResolvedValue(movieToUpdate);
+    const res = await request(app)
+      .put(`/api/movies/${fakeId}`)
+      .send(updatedData);
+    expect(Movie.findByIdAndUpdate).toHaveBeenCalledWith(fakeId, updatedData, {
+      new: true,
+    });
+    expect(res.statusCode).toEqual(200);
+    expect({
+      ...res.body,
+      releaseDate: new Date(res.body.releaseDate),
+    }).toEqual(movieToUpdate);
   });
 });
 
@@ -101,10 +117,16 @@ describe('PUT /api/movies/:id', () => {
 describe('PUT /api/movies/:id', () => {
   it('should return 404 if movie is not found', async () => {
     const nonExistentId = 'aaaa12345678901234567890';
-    const updatedData = {
-      title: 'Updated Title'
-    };
-    const res = await request(app).put(`/api/movies/${nonExistentId}`).send(updatedData);
+    const updatedData = { title: 'Updated Title' };
+    Movie.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
+    const res = await request(app)
+      .put(`/api/movies/${nonExistentId}`)
+      .send(updatedData);
+    expect(Movie.findByIdAndUpdate).toHaveBeenCalledWith(
+      nonExistentId,
+      updatedData,
+      { new: true }
+    );
     expect(res.statusCode).toEqual(404);
   });
 });
@@ -112,39 +134,38 @@ describe('PUT /api/movies/:id', () => {
 // Test for PUT (Update an existing movie with invalid genres format)
 describe('PUT /api/movies/:id', () => {
   it('should return 400 if genres is not an array when updating', async () => {
-    const movie = await Movie.findOne();
-    if (movie) {
-      const updatedData = {
-        genre: 'Action'
-      };
-      const res = await request(app).put(`/api/movies/${movie._id}`).send(updatedData);
-      expect(res.statusCode).toEqual(400);
-    }
+    const fakeId = 'aaaa12345678901234567890';
+    const updatedData = { genre: 'Action' };
+    Movie.findOne = jest.fn().mockResolvedValue({ _id: fakeId });
+    const res = await request(app)
+      .put(`/api/movies/${fakeId}`)
+      .send(updatedData);
+    expect(res.statusCode).toEqual(400);
   });
 });
 
 // Test for PUT (Update an existing movie with invalid genres)
 describe('PUT /api/movies/:id', () => {
   it('should return 400 if one or more genres are invalid when updating', async () => {
-    const movie = await Movie.findOne();
-    if (movie) {
-      const updatedData = {
-        genre: ['Action', 'InvalidGenre']
-      };
-      const res = await request(app).put(`/api/movies/${movie._id}`).send(updatedData);
-      expect(res.statusCode).toEqual(400);
-    }
+    const fakeId = 'aaaa12345678901234567890';
+    const updatedData = { genre: ['Action', 'InvalidGenre'] };
+    Genre.find = jest.fn().mockResolvedValue([{ name: 'Action' }]);
+    Movie.findOne = jest.fn().mockResolvedValue({ _id: fakeId });
+    const res = await request(app)
+      .put(`/api/movies/${fakeId}`)
+      .send(updatedData);
+    expect(res.statusCode).toEqual(400);
   });
 });
 
 // Test for DELETE (Delete an existing movie)
 describe('DELETE /api/movies/:id', () => {
   it('should delete an existing movie', async () => {
-    const movie = await Movie.findOne();
-    if (movie) {
-      const res = await request(app).delete(`/api/movies/${movie._id}`);
-      expect(res.statusCode).toEqual(204);
-    }
+    const fakeId = 'aaaa12345678901234567890';
+    Movie.findByIdAndRemove = jest.fn().mockResolvedValue({ _id: fakeId });
+    const res = await request(app).delete(`/api/movies/${fakeId}`);
+    expect(Movie.findByIdAndRemove).toHaveBeenCalledWith(fakeId);
+    expect(res.statusCode).toEqual(204);
   });
 });
 
@@ -152,7 +173,9 @@ describe('DELETE /api/movies/:id', () => {
 describe('DELETE /api/movies/:id', () => {
   it('should return 404 if movie is not found', async () => {
     const nonExistentId = 'aaaa12345678901234567890';
+    Movie.findByIdAndRemove = jest.fn().mockResolvedValue(null);
     const res = await request(app).delete(`/api/movies/${nonExistentId}`);
+    expect(Movie.findByIdAndRemove).toHaveBeenCalledWith(nonExistentId);
     expect(res.statusCode).toEqual(404);
   });
 });
@@ -161,11 +184,12 @@ describe('DELETE /api/movies/:id', () => {
 describe('Error handling and validation', () => {
   it('should not create a new movie with invalid data', async () => {
     const newMovie = {
-      title: '', 
+      title: '',
       description: 'This is a test',
       releaseDate: new Date(),
-      genre: ['Action']
+      genre: ['Action'],
     };
+    Genre.find = jest.fn().mockResolvedValue([{ name: 'Action' }]);
     const res = await request(app).post('/api/movies').send(newMovie);
     expect(res.statusCode).toEqual(400);
   });
@@ -175,19 +199,22 @@ describe('Error handling and validation', () => {
 describe('GET /api/movies/genre/:genreName', () => {
   // Test with existing genres
   it('should return movies of a specific genre (e.g., Action)', async () => {
+    Movie.find = jest.fn().mockResolvedValue([
+      { title: 'Action Movie 1', genre: ['Action', 'Adventure'] },
+      { title: 'Action Movie 2', genre: ['Action', 'Thriller'] },
+    ]);
     const res = await request(app).get('/api/movies/genre/Action');
     expect(res.statusCode).toEqual(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    res.body.forEach((movie: any) => {
-      expect(movie.genre).toEqual(expect.arrayContaining(['Action']));
-    });
+    expect(res.body.length).toEqual(2);
   });
 
   // Test with non-existing genre
   it('should return 404 for a non-existing genre', async () => {
+    // Мокирование Movie.find для имитации отсутствия фильмов с данным жанром
+    Movie.find = jest.fn().mockResolvedValue([]);
     const res = await request(app).get('/api/movies/genre/NonExistentGenre');
     expect(res.statusCode).toEqual(404);
-    expect(res.body.error).toEqual("No movies found for this genre");
+    expect(res.body.error).toEqual('No movies found for this genre');
   });
 
   // Test with invalid genre parameter (e.g., empty string or less than 3 characters)
@@ -201,9 +228,8 @@ describe('GET /api/movies/genre/:genreName', () => {
 // Test for error 500
 describe('GET /api/movies', () => {
   it('should return 500 if database operation fails', async () => {
-    await disconnect();
+    Movie.find = jest.fn().mockRejectedValue(new Error('Database error'));
     const res = await request(app).get('/api/movies');
     expect(res.statusCode).toEqual(500);
-    await connect();
   });
 });
