@@ -95,10 +95,8 @@ describe('GET /api/genres/:id', () => {
     expect(res.statusCode).toEqual(200);
     expect(res.body.name).toEqual(mockGenre.name);
   });
-});
 
 // Test for 404 error if genre is not found
-describe('GET /api/genres/:id', () => {
   it('should return 404 if genre is not found', async () => {
     const nonExistentId = 'aaaa12345678901234567890';
     Genre.findById = jest.fn().mockResolvedValue(null);

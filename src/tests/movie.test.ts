@@ -111,10 +111,8 @@ describe('PUT /api/movies/:id', () => {
       releaseDate: new Date(res.body.releaseDate),
     }).toEqual(movieToUpdate);
   });
-});
 
 // Test for PUT (Try to update a non-existent movie)
-describe('PUT /api/movies/:id', () => {
   it('should return 404 if movie is not found', async () => {
     const nonExistentId = 'aaaa12345678901234567890';
     const updatedData = { title: 'Updated Title' };
@@ -210,7 +208,6 @@ describe('GET /api/movies/genre/:genreName', () => {
 
   // Test with non-existing genre
   it('should return 404 for a non-existing genre', async () => {
-    // Мокирование Movie.find для имитации отсутствия фильмов с данным жанром
     Movie.find = jest.fn().mockResolvedValue([]);
     const res = await request(app).get('/api/movies/genre/NonExistentGenre');
     expect(res.statusCode).toEqual(404);
