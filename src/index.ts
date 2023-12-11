@@ -1,80 +1,34 @@
-import express, { Request, Response, Application } from 'express';
-import mongoose, { ConnectOptions } from 'mongoose';
-import { config } from 'dotenv';
-import swaggerJsDoc from 'swagger-jsdoc';
-import swaggerUi from 'swagger-ui-express';
-import { errorHandler } from './middlewares/errorHandler';
-import swaggerDefinition from './swagger';
-import healthCheckRouter from './routes/healthCheck';
-import movieRoutes from './routes/movieRoutes';
-import genreRoutes from './routes/genreRoutes';
-config();
+import mongoose from 'mongoose';
+import app from './app';
+import { connect, disconnect } from './database';
 
-const app: Application = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
-const username = process.env.DB_USERNAME;
-const password = process.env.DB_PASSWORD;
-const cluster = process.env.DB_CLUSTER;
-const databaseName = process.env.DB_NAME;
+const startServer = async () => {
+  await connect();
 
-const uri: string = `mongodb+srv://${username}:${password}@${cluster}/${databaseName}?retryWrites=true&w=majority`;
+  const connectionStatus = mongoose.connection.readyState;
 
-const options: ConnectOptions = {
-  maxPoolSize: 10,
-  socketTimeoutMS: 45000,
-};
+  if (connectionStatus === 1) {
+    const server = app.listen(PORT, () => {
+      console.log(`Server listening on port ${PORT}`);
+    });
 
-async function run() {
-  try {
-    await mongoose.connect(uri, options);
-    console.log("MongoDB Connected");
-    const connectionStatus = mongoose.connection.readyState;
-    console.log(`Connection Status: ${connectionStatus === 1 ? 'Connected' : 'Disconnected'}`);
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error("Error: ", error.message);
-    }
+    const shutdown = async () => {
+      console.log('Shutting down server...');
+      await disconnect();
+
+      server.close(() => {
+        console.log('Server closed.');
+      });
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+
+  } else {
+    console.error('Database connection failed. Server not started.');
   }
-}
-
-run();
-
-app.use(express.json());
-
-const swaggerDocs = swaggerJsDoc({
-  definition: swaggerDefinition,
-  apis: ['./src/routes/*.ts'],
-});
-
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-
-app.use('/api/movies', movieRoutes);
-
-app.use('/api/genres', genreRoutes);
-
-app.get('/', (req: Request, res: Response): void => {
-  res.send('Hello World!');
-});
-
-app.use('/health-check', healthCheckRouter);
-
-app.use(errorHandler);
-
-const server = app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
-
-const shutdown = async () => {
-  console.log('Shutting down server...');
-
-  await mongoose.connection.close();
-  console.log("MongoDB Disconnected");
-
-  server.close(() => {
-    console.log('Server closed.');
-  });
 };
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+startServer();

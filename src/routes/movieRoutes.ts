@@ -67,9 +67,6 @@ const genreNameSchema = Joi.string().min(3).max(50).messages({
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     await movieSchema.validateAsync(req.body);
-    if (!Array.isArray(req.body.genre)) {
-      return res.status(400).json({ error: 'Genres must be an array' });
-    }
     const areGenresValid = await validateGenres(req.body.genre);
     if (!areGenresValid) {
       return res.status(400).json({ error: 'One or more genres are invalid' });
@@ -184,9 +181,6 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     await idSchema.validateAsync(req.params.id);
     await movieUpdateSchema.validateAsync(req.body);
     if ('genre' in req.body) {
-      if (!Array.isArray(req.body.genre)) {
-        return res.status(400).json({ error: 'Genres must be an array' });
-      }
       const areGenresValid = await validateGenres(req.body.genre);
       if (!areGenresValid) {
         return res.status(400).json({ error: 'One or more genres are invalid' });
@@ -215,7 +209,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
  *         required: true
  *         description: ID of the movie to delete
  *     responses:
- *       200:
+ *       204:
  *         description: OK
  *         content:
  *           application/json:
@@ -233,7 +227,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     await idSchema.validateAsync(req.params.id);
     const deletedMovie = await Movie.findByIdAndRemove(req.params.id);
     if (deletedMovie) {
-      res.status(200).json(deletedMovie);
+      res.status(204).json(deletedMovie);
     } else {
       res.status(404).json({ error: "Movie not found" });
     }

@@ -181,7 +181,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
  *         schema:
  *           type: string
  *     responses:
- *       200:
+ *       204:
  *         description: OK
  *         content:
  *           application/json:
@@ -199,7 +199,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
       await idSchema.validateAsync(req.params.id);
       const deletedGenre = await Genre.findByIdAndDelete(req.params.id);
       if (deletedGenre) {
-        res.status(200).json(deletedGenre);
+        res.status(204).json(deletedGenre);
       } else {
         res.status(404).json({ error: "Genre not found" });
       }
